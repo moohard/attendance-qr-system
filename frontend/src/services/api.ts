@@ -110,5 +110,8 @@ export const handleApiError = (error: unknown): string => {
     if (error instanceof Error) {
         return error.message;
     }
+    if (typeof error === 'string') {
+        return error; // ✅ Handle string errors
+    }
     return 'An unexpected error occurred';
 };

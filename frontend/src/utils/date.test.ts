@@ -19,7 +19,8 @@ describe('Date Utilities', () => {
         it('should format time correctly', () => {
             const date = '2024-01-15T10:30:00Z'
             const formatted = formatTime(date)
-            expect(formatted).toMatch(/\d{1,2}:\d{2}/) // Match time format
+            // Terima format dengan titik ATAU colon
+            expect(formatted).toMatch(/^\d{1,2}[.:]\d{2}$/)
         })
     })
 

@@ -1,5 +1,20 @@
+// api.test.ts
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { api, handleApiError } from './api'
+
+// Mock localStorage
+const localStorageMock = {
+    getItem: vi.fn(),
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+    clear: vi.fn(),
+}
+
+// Set global localStorage mock
+Object.defineProperty(global, 'localStorage', {
+    value: localStorageMock,
+    writable: true,
+})
 
 // Mock axios
 vi.mock('axios', () => {
@@ -7,7 +22,13 @@ vi.mock('axios', () => {
         default: {
             create: vi.fn(() => ({
                 interceptors: {
-                    request: { use: vi.fn(), eject: vi.fn() },
+                    request: {
+                        use: vi.fn((callback) => {
+                            // Simulate request interceptor
+                            callback({ headers: {} })
+                        }),
+                        eject: vi.fn()
+                    },
                     response: { use: vi.fn(), eject: vi.fn() },
                 },
                 get: vi.fn(),
@@ -29,7 +50,7 @@ describe('API Service', () => {
 
         it('should handle string error', () => {
             const result = handleApiError('Test error')
-            expect(result).toBe('Test error')
+            expect(result).toBe('Test error') // ✅ Sekarang akan pass
         })
 
         it('should handle unknown error', () => {
@@ -40,16 +61,35 @@ describe('API Service', () => {
 
     describe('API Interceptors', () => {
         beforeEach(() => {
-            localStorage.clear()
             vi.clearAllMocks()
+            localStorageMock.clear()
         })
 
         it('should add authorization header when token exists', async () => {
-            localStorage.setItem('auth_token', 'test-token')
+            // Mock localStorage untuk return token
+            localStorageMock.getItem.mockReturnValue('test-token')
 
-            // We need to test this indirectly through API calls
-            // The actual interceptor test would require more complex setup
-            expect(localStorage.getItem).toBeDefined()
+            // Test interceptor request
+            const requestConfig = { headers: {} }
+            const interceptor = api.interceptors.request.use
+            const callback = interceptor.mock.calls[0][0] // Get the callback
+
+            const result = callback(requestConfig)
+
+            expect(result.headers.Authorization).toBe('Bearer test-token')
+            expect(localStorageMock.getItem).toHaveBeenCalledWith('auth_token')
+        })
+
+        it('should not add authorization header when no token exists', async () => {
+            localStorageMock.getItem.mockReturnValue(null)
+
+            const requestConfig = { headers: {} }
+            const interceptor = api.interceptors.request.use
+            const callback = interceptor.mock.calls[0][0]
+
+            const result = callback(requestConfig)
+
+            expect(result.headers.Authorization).toBeUndefined()
         })
     })
 })

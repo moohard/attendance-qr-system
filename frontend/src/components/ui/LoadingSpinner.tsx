@@ -1,4 +1,4 @@
-import { cn } from '../../utils/cn';
+import { cn } from '../../utils/cn'
 
 interface LoadingSpinnerProps {
     size?: 'sm' | 'md' | 'lg';
@@ -7,18 +7,22 @@ interface LoadingSpinnerProps {
 
 export const LoadingSpinner = ({ size = 'md', className }: LoadingSpinnerProps) => {
     const sizes = {
-        sm: 'w-4 h-4',
-        md: 'w-8 h-8',
-        lg: 'w-12 h-12',
-    };
+        sm: 'h-4 w-4',
+        md: 'h-6 w-6',
+        lg: 'h-8 w-8',
+    }
 
     return (
         <div
             className={cn(
-                'animate-spin rounded-full border-2 border-gray-300 border-t-primary-600',
+                'animate-spin rounded-full border-2 border-current border-t-transparent',
                 sizes[size],
                 className
             )}
-        />
-    );
-};
+            role="status"
+            aria-label="Loading"
+        >
+            <span className="sr-only">Loading</span>
+        </div>
+    )
+}
