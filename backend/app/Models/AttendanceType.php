@@ -19,8 +19,8 @@ class AttendanceType extends Model
     ];
 
     protected $casts = [
-        'start_time' => 'datetime:H:i',
-        'end_time'   => 'datetime:H:i',
+        'start_time' => 'datetime:H:i:s',
+        'end_time'   => 'datetime:H:i:s',
     ];
 
     public function attendances(): HasMany
@@ -29,4 +29,10 @@ class AttendanceType extends Model
         return $this->hasMany(Attendance::class);
     }
 
-}
+    public function reports(): HasMany
+    {
+
+        return $this->hasMany(Report::class);
+    }
+
+}   

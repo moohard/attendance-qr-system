@@ -10,7 +10,7 @@ export interface User {
 }
 
 export interface Attendance {
-    user: any;
+    user: unknown;
     id: number;
     user_id: number;
     attendance_type_id: number;

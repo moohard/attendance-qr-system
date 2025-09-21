@@ -21,8 +21,14 @@ return new class extends Migration {
             $table->enum('role', [ 'admin', 'user' ])->default('user');
             $table->string('qr_code')->unique()->nullable();
             $table->boolean('is_honorer')->default(FALSE);
+            $table->rememberToken();
             $table->timestamps();
             $table->softDeletes();
+            $table->index('email');
+            $table->index('role');
+            $table->index('is_honorer');
+            $table->index('qr_code');
+            $table->index([ 'role', 'is_honorer' ]);
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table)

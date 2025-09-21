@@ -53,6 +53,22 @@ services:
       - "6385:6379"
     networks:
       - attendance-network
+  worker:
+    build:
+      context: ./docker/php
+      dockerfile: Dockerfile
+    container_name: attendance-worker
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./backend:/var/www
+    depends_on:
+      - app
+      - redis
+    networks:
+      - attendance-network
+    command: >
+      sh -c "php artisan queue:work --sleep=3 --tries=3 --timeout=90"
 
 volumes:
   dbdata:

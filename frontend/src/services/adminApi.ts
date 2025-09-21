@@ -1,5 +1,5 @@
 import { api, handleApiError } from './api';
-import type { User, UserStats, AttendanceStats, Report, PaginatedResponse } from '../types';
+import type { User, UserStats, AttendanceStats, Report, PaginatedResponse, Attendance, ReportFilters, ReportGenerationRequest, AttendanceFilters } from '../types';
 
 export const adminAPI = {
     // User Management
@@ -32,22 +32,6 @@ export const adminAPI = {
 
     getAttendanceStats: async (): Promise<AttendanceStats> => {
         const response = await api.get('/admin/stats/attendance');
-        return response.data;
-    },
-
-    // Reports
-    getReports: async (page = 1, perPage = 10): Promise<PaginatedResponse<Report>> => {
-        const response = await api.get('/admin/reports', {
-            params: { page, per_page: perPage }
-        });
-        return response.data;
-    },
-
-    generateReport: async (period: string, attendanceTypeId?: number): Promise<Report> => {
-        const response = await api.post('/admin/reports/generate', {
-            period,
-            attendance_type_id: attendanceTypeId
-        });
         return response.data;
     },
 

@@ -24,6 +24,13 @@ return new class extends Migration {
             $table->timestamps();
 
             $table->index([ 'user_id', 'attendance_type_id' ]);
+            $table->index([ 'user_id', 'check_in' ]);
+            $table->index([ 'attendance_type_id', 'check_in' ]);
+            $table->index('check_in');
+            $table->index('check_out');
+            $table->index('is_late');
+            $table->index('is_early');
+            $table->index([ 'user_id', 'check_in', 'check_out' ]);
         });
     }
 

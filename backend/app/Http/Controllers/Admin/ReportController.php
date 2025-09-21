@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\GenerateReportJob;
 use App\Models\Report;
 use App\Models\Attendance;
 use App\Models\AttendanceType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use App\Services\SignatureService;
 use PDF;
 
 class ReportController extends Controller
@@ -62,28 +64,14 @@ class ReportController extends Controller
             'format'             => 'nullable|in:pdf,excel',
         ]);
 
-        // Generate report data
-        $reportData = $this->generateReportData($validated['period'], $validated['attendance_type_id'] ?? NULL);
+        // Dispatch job untuk async processing
+        GenerateReportJob::dispatch($validated, auth()->id());
 
-        // Create report record
-        $report = Report::create([
+        return response()->json([
+            'message'            => 'Report generation started. It will be available shortly.',
             'period'             => $validated['period'],
-            'attendance_type_id' => $validated['attendance_type_id'],
-            'file_path'          => NULL, // Will be updated after file generation
-            'is_signed'          => FALSE,
+            'attendance_type_id' => $validated['attendance_type_id'] ?? NULL,
         ]);
-
-        // Generate PDF file
-        $fileName = "report-{$validated['period']}-" . ($validated['attendance_type_id'] ?: 'all') . '.pdf';
-        $filePath = "reports/{$fileName}";
-
-        $pdf = PDF::loadView('reports.attendance', $reportData);
-        Storage::put($filePath, $pdf->output());
-
-        // Update report with file path
-        $report->update([ 'file_path' => $filePath ]);
-
-        return response()->json($report->load('attendanceType'));
     }
 
     public function download($id)
@@ -99,7 +87,7 @@ class ReportController extends Controller
         return Storage::download($report->file_path, "report-{$report->period}.pdf");
     }
 
-    public function sign(Request $request, $id)
+    public function sign(Request $request, $id, SignatureService $signatureService)
     {
 
         $validated = $request->validate([
@@ -108,13 +96,32 @@ class ReportController extends Controller
 
         $report = Report::findOrFail($id);
 
-        $report->update([
-            'is_signed'      => TRUE,
-            'signed_at'      => now(),
-            'signature_data' => $validated['signature_data'],
-        ]);
+        // Validate signature
+        if (!$signatureService->validateSignature($validated['signature_data']))
+        {
+            return response()->json([ 'error' => 'Invalid signature format' ], 400);
+        }
 
-        return response()->json($report);
+        try
+        {
+            // Save signature to encrypted storage
+            $signaturePath = $signatureService->saveSignature(
+                $validated['signature_data'],
+                "report_{$id}_signature.dat",
+            );
+
+            $report->update([
+                'is_signed'      => TRUE,
+                'signed_at'      => now(),
+                'signature_data' => $signaturePath, // Simpan path file, bukan data mentah
+            ]);
+
+            return response()->json($report->load('attendanceType'));
+
+        } catch (\Exception $e)
+        {
+            return response()->json([ 'error' => $e->getMessage() ], 500);
+        }
     }
 
     private function generateReportData($period, $attendanceTypeId = NULL)

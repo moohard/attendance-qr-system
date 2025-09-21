@@ -55,6 +55,7 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'email'    => 'required|email',
             'password' => 'required|string|min:6',
+            'code'     => 'sometimes|string|size:6', // 2FA code
         ]);
 
         if ($validator->fails())
@@ -62,21 +63,30 @@ class AuthController extends Controller
             return response()->json($validator->errors(), 422);
         }
 
-        // Gunakan Auth::validate() untuk memvalidasi credentials
-        if (!Auth::guard('web')->validate($request->only('email', 'password')))
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user || !Hash::check($request->password, $user->password))
         {
             return response()->json([ 'error' => 'Unauthorized' ], 401);
         }
 
-        // Dapatkan user berdasarkan email
-        $user = User::where('email', $request->email)->first();
-
-        if (!$user)
+        // Check if 2FA is enabled
+        if ($user->google2fa_enabled)
         {
-            return response()->json([ 'error' => 'User not found' ], 404);
+            if (!$request->has('code'))
+            {
+                return response()->json([
+                    'error'        => '2FA required',
+                    'requires_2fa' => TRUE,
+                ], 401);
+            }
+
+            if (!$user->verifyTwoFactorCode($request->code))
+            {
+                return response()->json([ 'error' => 'Invalid 2FA code' ], 401);
+            }
         }
 
-        // Create API token
         $token = $user->createToken('auth-token')->plainTextToken;
 
         return response()->json([
