@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { attendanceAPI } from '../services/api';
 import { handleApiError } from '../services/api';
 import type { Attendance, AttendanceType } from '../types';
+import toast from 'react-hot-toast';
 
 export const useAttendance = () => {
   const [attendances, setAttendances] = useState<Attendance[]>([]);
@@ -49,15 +50,18 @@ export const useAttendance = () => {
   }, []);
 
   const checkIn = async (data: Parameters<typeof attendanceAPI.checkIn>[0]) => {
+    const toastId = toast.loading('Processing Check-in...');
     try {
       setIsLoading(true);
       setError(null);
-      const attendance = await attendanceAPI.checkIn(data);
+      const result = await attendanceAPI.checkIn(data);
       await loadActiveAttendances();
-      return { success: true as const, data: attendance };
+      toast.success('Check-in successful!', { id: toastId });
+      return { success: true as const, data: result };
     } catch (err) {
       const errorMsg = handleApiError(err);
       setError(errorMsg);
+      toast.error(`Check-in failed: ${errorMsg}`, { id: toastId });
       return { success: false as const, error: errorMsg };
     } finally {
       setIsLoading(false);
@@ -65,15 +69,18 @@ export const useAttendance = () => {
   };
 
   const checkOut = async (attendanceId: number, data: Parameters<typeof attendanceAPI.checkOut>[1]) => {
+    const toastId = toast.loading('Processing Check-out...');
     try {
       setIsLoading(true);
       setError(null);
-      const attendance = await attendanceAPI.checkOut(attendanceId, data);
+      const result = await attendanceAPI.checkOut(attendanceId, data);
       await loadActiveAttendances();
-      return { success: true as const, data: attendance };
+      toast.success('Check-out successful!', { id: toastId });
+      return { success: true as const, data: result };
     } catch (err) {
       const errorMsg = handleApiError(err);
       setError(errorMsg);
+      toast.error(`Check-out failed: ${errorMsg}`, { id: toastId });
       return { success: false as const, error: errorMsg };
     } finally {
       setIsLoading(false);

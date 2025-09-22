@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { config } from '../config/env';
-import type { ApiResponse, LoginCredentials, RegisterData, User, Attendance, AttendanceType } from '../types';
+import type { LoginCredentials, RegisterData, User, Attendance, AttendanceType } from '../types';
 
 export const api = axios.create({
     baseURL: config.API_URL,
@@ -45,21 +45,21 @@ api.interceptors.response.use(
 // Auth API
 export const authAPI = {
     login: async (credentials: LoginCredentials): Promise<{ user: User; access_token: string }> => {
-        const response = await api.post('/auth/login', credentials);
+        const response = await api.post('/login', credentials);
         return response.data;
     },
 
     register: async (userData: RegisterData): Promise<{ user: User; token: string }> => {
-        const response = await api.post('/auth/register', userData);
+        const response = await api.post('/register', userData);
         return response.data;
     },
 
     logout: async (): Promise<void> => {
-        await api.post('/auth/logout');
+        await api.post('/logout');
     },
 
     getProfile: async (): Promise<User> => {
-        const response = await api.get('/auth/user-profile');
+        const response = await api.get('/user');
         return response.data;
     },
 };

@@ -1,6 +1,10 @@
 import { useRef, useEffect, useState } from 'react';
+import type { FormEvent } from 'react';
 import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
 import { Card, CardContent, CardHeader } from '../ui/Card';
+import { Modal } from '../ui/Modal'; // 1. Import Modal
+import QrScanner from 'qr-scanner';
 
 interface QrScannerProps {
   onScan: (data: string) => void;
@@ -8,91 +12,127 @@ interface QrScannerProps {
   title?: string;
 }
 
-export const QrScanner = ({ onScan, onClose, title = 'Scan QR Code' }: QrScannerProps) => {
+export const QrScannerComponent = ({ onScan, onClose, title = 'Scan QR Code' }: QrScannerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
+  const [isManualInputOpen, setIsManualInputOpen] = useState(false); // 2. State untuk mengontrol modal
+  const [manualQr, setManualQr] = useState('');
 
   useEffect(() => {
-    initCamera();
-    return () => {
-      stopCamera();
-    };
-  }, []);
+    let scanner: QrScanner | null = null;
+    if (videoRef.current && hasPermission !== false) {
+      scanner = new QrScanner(
+        videoRef.current,
+        result => {
+          console.log('decoded qr code:', result);
+          onScan(result.data);
+        },
+        {
+          onDecodeError: error => {
+            console.warn(error);
+          },
+          highlightScanRegion: true,
+          highlightCodeOutline: true,
+        },
+      );
 
-  const initCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
-      });
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+      scanner.start().then(() => {
         setHasPermission(true);
-      }
-    } catch (error) {
-      setHasPermission(false);
-      console.error('Camera access denied:', error);
+      }).catch(err => {
+        console.error("Camera start failed:", err);
+        setHasPermission(false);
+      });
+    }
+
+    return () => {
+      scanner?.destroy();
+    };
+  }, [onScan, hasPermission]);
+
+
+  const handleManualSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (manualQr) {
+      onScan(manualQr);
+      setIsManualInputOpen(false);
+      setManualQr('');
     }
   };
 
-  const stopCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
-    }
-  };
+  // Komponen Modal untuk input manual
+  const ManualInputModal = () => (
+    <Modal
+      isOpen={isManualInputOpen}
+      onClose={() => setIsManualInputOpen(false)}
+      title="Enter QR Code Manually"
+    >
+      <form onSubmit={handleManualSubmit} className="p-6 space-y-4">
+        <Input
+          label="QR Code Content"
+          value={manualQr}
+          onChange={(e) => setManualQr(e.target.value)}
+          placeholder="Paste QR content here"
+          required
+        />
+        <div className="flex justify-end space-x-2">
+          <Button type="button" variant="outline" onClick={() => setIsManualInputOpen(false)}>
+            Cancel
+          </Button>
+          <Button type="submit">Submit</Button>
+        </div>
+      </form>
+    </Modal>
+  );
 
-  const handleManualInput = () => {
-    const qrContent = prompt('Enter QR code content manually:');
-    if (qrContent) {
-      onScan(qrContent);
-    }
-  };
-
+  // Tampilan jika izin kamera ditolak
   if (hasPermission === false) {
     return (
+      <>
+        <Card>
+          <CardHeader>
+            <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8">
+              <p className="text-red-600 mb-4">Camera access is required or was denied.</p>
+              <Button onClick={() => setIsManualInputOpen(true)}>
+                Enter QR Code Manually
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+        <ManualInputModal />
+      </>
+    );
+  }
+
+  // Tampilan utama pemindai
+  return (
+    <>
       <Card>
         <CardHeader>
           <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8">
-            <p className="text-red-600 mb-4">Camera access is required to scan QR codes</p>
-            <Button onClick={handleManualInput}>
-              Enter QR Code Manually
+          <div className="relative">
+            <video
+              ref={videoRef}
+              className="w-full h-64 object-cover rounded-lg bg-gray-200"
+            />
+            {hasPermission && <div className="absolute inset-0 border-4 border-primary-500 rounded-lg pointer-events-none animate-pulse" />}
+          </div>
+          <div className="mt-4 flex space-x-3">
+            <Button onClick={() => setIsManualInputOpen(true)} variant="outline">
+              Manual Input
+            </Button>
+            <Button onClick={onClose} variant="secondary">
+              Cancel
             </Button>
           </div>
         </CardContent>
       </Card>
-    );
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-      </CardHeader>
-      <CardContent>
-        <div className="relative">
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            className="w-full h-64 object-cover rounded-lg"
-          />
-          <div className="absolute inset-0 border-4 border-primary-500 rounded-lg pointer-events-none" />
-        </div>
-        
-        <div className="mt-4 flex space-x-3">
-          <Button onClick={handleManualInput} variant="outline">
-            Manual Input
-          </Button>
-          <Button onClick={onClose} variant="secondary">
-            Cancel
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+      <ManualInputModal />
+    </>
   );
 };
+

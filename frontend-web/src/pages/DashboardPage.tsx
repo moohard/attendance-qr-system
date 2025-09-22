@@ -4,7 +4,7 @@ import { useAttendance } from '../hooks/useAttendance';
 import { Button } from '../components/ui/Button';
 import { Card, CardContent, CardHeader } from '../components/ui/Card';
 import { AttendanceList } from '../components/attendance/AttendanceList';
-import { QrScanner } from '../components/attendance/QrScanner';
+import { QrScannerComponent } from '../components/attendance/QrScanner';
 import { formatDate } from '../utils/date';
 import type { Attendance } from '../types';
 
@@ -48,7 +48,7 @@ export const DashboardPage = () => {
         setShowScanner(true);
     };
 
-    const handleCheckOutScan = async (qrContent: string) => {
+    const handleCheckOutScan = async () => {
         if (selectedAttendance) {
             const result = await checkOut(selectedAttendance.id, {});
             if (result.success) {
@@ -96,7 +96,7 @@ export const DashboardPage = () => {
             {showScanner && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
                     <div className="max-w-md w-full">
-                        <QrScanner
+                        <QrScannerComponent
                             onScan={scannerMode === 'checkin' ? handleCheckIn : handleCheckOutScan}
                             onClose={() => setShowScanner(false)}
                             title={scannerMode === 'checkin' ? 'Scan QR Code to Check In' : 'Scan QR Code to Check Out'}

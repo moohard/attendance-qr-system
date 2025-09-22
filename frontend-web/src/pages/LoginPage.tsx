@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { useAuth } from '../hooks/useAuth';
+import { useNavigate } from 'react-router-dom'; // 1. Import useNavigate
+import { useAuth } from '../context/AuthContext'; // 2. Pastikan import dari context
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card, CardContent, CardHeader } from '../components/ui/Card';
 
 export const LoginPage = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('admin@attendance.com');
+  const [password, setPassword] = useState('password123');
   const [error, setError] = useState('');
   const { login, isLoading } = useAuth();
+  const navigate = useNavigate(); // 3. Panggil hook useNavigate
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,7 +22,14 @@ export const LoginPage = () => {
     }
 
     const result = await login({ email, password });
-    if (!result.success) {
+
+    // --- PERBAIKAN DI SINI ---
+    // 4. Jika login berhasil, lakukan navigasi secara eksplisit
+    if (result.success) {
+      // Arahkan berdasarkan peran (role) dari data pengguna yang dikembalikan
+      navigate(result.user.role === 'admin' ? '/admin' : '/attendance');
+    } else {
+      // Jika gagal, tampilkan error
       setError(result.error);
     }
   };
@@ -44,7 +53,7 @@ export const LoginPage = () => {
                   <p className="text-sm text-red-600">{error}</p>
                 </div>
               )}
-              
+
               <Input
                 label="Email"
                 type="email"
@@ -53,7 +62,7 @@ export const LoginPage = () => {
                 required
                 disabled={isLoading}
               />
-              
+
               <Input
                 label="Password"
                 type="password"
@@ -62,7 +71,7 @@ export const LoginPage = () => {
                 required
                 disabled={isLoading}
               />
-              
+
               <Button
                 type="submit"
                 className="w-full"
@@ -72,7 +81,7 @@ export const LoginPage = () => {
                 Sign in
               </Button>
             </form>
-            
+
             <div className="mt-6">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
@@ -82,7 +91,7 @@ export const LoginPage = () => {
                   <span className="px-2 bg-white text-gray-500">Demo Credentials</span>
                 </div>
               </div>
-              
+
               <div className="mt-4 text-xs text-gray-600">
                 <p>Email: admin@attendance.com</p>
                 <p>Password: password123</p>
@@ -94,3 +103,4 @@ export const LoginPage = () => {
     </div>
   );
 };
+

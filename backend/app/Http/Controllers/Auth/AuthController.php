@@ -3,89 +3,81 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\LoginRequest;
+use App\Http\Requests\Auth\RegisterRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
 
-    public function register(Request $request)
+    /**
+     * Handle user registration.
+     */
+    public function register(RegisterRequest $request)
     {
 
-        $validator = Validator::make($request->all(), [
-            'name'       => 'required|string|max:255',
-            'email'      => 'required|string|email|max:255|unique:users',
-            'password'   => 'required|string|min:6|confirmed',
-            'role'       => 'sometimes|in:admin,user',
-            'is_honorer' => 'sometimes|boolean',
-        ]);
-
-        if ($validator->fails())
-        {
-            return response()->json($validator->errors(), 422);
-        }
+        $validated = $request->validated();
 
         $user = User::create([
-            'name'       => $request->name,
-            'email'      => $request->email,
-            'password'   => Hash::make($request->password),
-            'role'       => $request->role ?? 'user',
-            'is_honorer' => $request->is_honorer ?? FALSE,
+            'name'          => $validated['name'],
+            'email'         => $validated['email'],
+            'password'      => Hash::make($validated['password']),
+            'role'          => $validated['role'] ?? 'user',
+            'employee_type' => $validated['employee_type'] ?? 'tetap',
         ]);
 
-        // Generate QR code
-        $user->generateQRCode();
-
-        // Create API token
         $token = $user->createToken('auth-token')->plainTextToken;
 
         return response()->json([
-            'message' => 'User successfully registered',
-            'user'    => $user,
-            'token'   => $token,
+            'access_token' => $token,
+            'token_type'   => 'bearer',
+            'user'         => $user,
         ], 201);
     }
 
-    public function login(Request $request)
+    /**
+     * Handle user login.
+     */
+    public function login(LoginRequest $request)
     {
 
-        $validator = Validator::make($request->all(), [
-            'email'    => 'required|email',
-            'password' => 'required|string|min:6',
-            'code'     => 'sometimes|string|size:6', // 2FA code
-        ]);
+        $credentials = $request->validated();
 
-        if ($validator->fails())
-        {
-            return response()->json($validator->errors(), 422);
-        }
+        // Manual authentication check untuk API
+        $user = User::where('email', $credentials['email'])->first();
 
-        $user = User::where('email', $request->email)->first();
-
-        if (!$user || !Hash::check($request->password, $user->password))
+        if (!$user || !Hash::check($credentials['password'], $user->password))
         {
             return response()->json([ 'error' => 'Unauthorized' ], 401);
         }
 
-        // Check if 2FA is enabled
+        // 2FA check dengan logic yang benar
         if ($user->google2fa_enabled)
         {
-            if (!$request->has('code'))
+            // Jika 2FA enabled tapi tidak ada kode
+            if (!isset($credentials['code']) || empty($credentials['code']))
             {
                 return response()->json([
-                    'error'        => '2FA required',
+                    'error'        => '2FA code required',
                     'requires_2fa' => TRUE,
                 ], 401);
             }
 
-            if (!$user->verifyTwoFactorCode($request->code))
+            // Verifikasi kode 2FA
+            if (!$user->verifyTwoFactorCode($credentials['code']))
             {
-                return response()->json([ 'error' => 'Invalid 2FA code' ], 401);
+                return response()->json([
+                    'error'        => 'Invalid 2FA code',
+                    'requires_2fa' => TRUE,
+                ], 401);
             }
         }
+
+        // Hapus token lama jika ada
+        $user->tokens()->delete();
 
         $token = $user->createToken('auth-token')->plainTextToken;
 
@@ -96,31 +88,41 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * Log the user out (Invalidate the token).
+     */
     public function logout(Request $request)
     {
 
-        // Hapus current access token
         $request->user()->currentAccessToken()->delete();
 
         return response()->json([ 'message' => 'User successfully signed out' ]);
     }
 
+    /**
+     * Get the authenticated User.
+     */
     public function userProfile(Request $request)
     {
 
         return response()->json($request->user());
     }
 
+    /**
+     * Refresh a token.
+     */
     public function refresh(Request $request)
     {
 
-        // Hapus token lama dan buat token baru
-        $request->user()->currentAccessToken()->delete();
-        $token = $request->user()->createToken('auth-token')->plainTextToken;
+        $user = $request->user();
+        $user->currentAccessToken()->delete(); // Hapus token current saja
+
+        $token = $user->createToken('auth-token')->plainTextToken;
 
         return response()->json([
             'access_token' => $token,
             'token_type'   => 'bearer',
+            'user'         => $user, // Tambahkan user data juga
         ]);
     }
 

@@ -44,7 +44,6 @@ class User extends Authenticatable
             'password'          => 'hashed',
             'is_honorer'        => 'boolean',
             'google2fa_enabled' => 'boolean',
-
         ];
     }
 

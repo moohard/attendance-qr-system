@@ -25,7 +25,6 @@ class AppServiceProvider extends ServiceProvider
     {
 
         $kernel = $this->app->make(Kernel::class);
-        $kernel->appendMiddlewareToGroup('api', ValidateApiInput::class);
     }
 
 }

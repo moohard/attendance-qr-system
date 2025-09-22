@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
-import { LoadingSpinner } from '../ui/LoadingSpinner';
+import { useAuth } from '../../context/AuthContext'; // Ganti ke context
 
 interface ProtectedRouteProps {
     children: ReactNode;
@@ -9,21 +8,13 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
-    const { user, isLoading } = useAuth();
+    const { user, isAuthenticated } = useAuth();
 
-    if (isLoading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <LoadingSpinner size="lg" />
-            </div>
-        );
-    }
-
-    if (!user) {
+    if (!isAuthenticated) {
         return <Navigate to="/login" replace />;
     }
 
-    if (requiredRole && user.role !== requiredRole) {
+    if (requiredRole && user?.role !== requiredRole) {
         return <Navigate to="/dashboard" replace />;
     }
 
