@@ -91,42 +91,6 @@ class AttendanceService
         return $query->get();
     }
 
-    public function validateQRCode($qrContent)
-    {
-
-        try
-        {
-            $data = json_decode($qrContent, TRUE);
-
-            // Validasi struktur QR code
-            if (!isset($data['user_id']) || !isset($data['timestamp']))
-            {
-                return NULL;
-            }
-
-            // Cek apakah QR code masih valid (dibuat dalam 5 menit terakhir)
-            $qrTime = Carbon::createFromTimestamp($data['timestamp']);
-            if ($qrTime->diffInMinutes(Carbon::now()) > 5)
-            {
-                return NULL;
-            }
-
-            // Cek apakah user exists
-            $user = User::find($data['user_id']);
-            if (!$user)
-            {
-                return NULL;
-            }
-
-            return $user;
-
-        } catch (\Exception $e)
-        {
-            Log::error('QR validation error: ' . $e->getMessage());
-            return NULL;
-        }
-    }
-
     public function checkInToActivity(User $user, $activityId, $latitude = NULL, $longitude = NULL, $notes = NULL)
     {
 
@@ -194,40 +158,176 @@ class AttendanceService
         return $attendance;
     }
 
-    public function validateActivityQRCode($qrContent)
+    public function validateQRCode($qrContent)
     {
 
         try
         {
+            \Log::info('QR Validation Started', [ 'qr_content' => substr($qrContent, 0, 100) ]);
+
             $data = json_decode($qrContent, TRUE);
 
-            // Basic validation
-            if (!isset($data['type'], $data['activity_id'], $data['timestamp'], $data['expires_at']) || $data['type'] !== 'activity')
+            if (json_last_error() !== JSON_ERROR_NONE)
             {
+                \Log::error('QR validation failed: Invalid JSON', [
+                    'json_error' => json_last_error_msg(),
+                    'qr_content' => substr($qrContent, 0, 200),
+                ]);
                 return NULL;
             }
 
-            // Check expiry
-            $expiryTime = Carbon::parse($data['expires_at']);
-            if (now()->gt($expiryTime))
+            // Debug log data yang diterima
+            \Log::debug('QR Data Received', $data);
+
+            // Check required fields
+            $requiredFields = [ 'type', 'user_id', 'timestamp', 'expires_at' ];
+            foreach ($requiredFields as $field)
             {
-                return NULL; // QR expired
+                if (!isset($data[$field]))
+                {
+                    \Log::error('QR validation failed: Missing field', [
+                        'missing_field'    => $field,
+                        'available_fields' => array_keys($data),
+                    ]);
+                    return NULL;
+                }
             }
 
-            // Get activity
-            $activity = Activity::find($data['activity_id']);
-            if (!$activity || !$activity->isActive())
+            // Parse waktu dengan error handling
+            try
             {
+                $expiryTime = Carbon::parse($data['expires_at']);
+                $qrTime     = Carbon::parse($data['timestamp']);
+                $now        = Carbon::now();
+            } catch (\Exception $e)
+            {
+                \Log::error('QR validation failed: Invalid timestamp format', [
+                    'expires_at' => $data['expires_at'],
+                    'timestamp'  => $data['timestamp'],
+                    'error'      => $e->getMessage(),
+                ]);
                 return NULL;
             }
 
-            return $activity;
+            // Check expiry dengan tolerance 10 detik untuk sinkronisasi waktu
+            if ($now->diffInSeconds($expiryTime, FALSE) < -10)
+            { // Expired lebih dari 10 detik
+                \Log::warning('QR code expired', [
+                    'now'          => $now->toISOString(),
+                    'expires_at'   => $expiryTime->toISOString(),
+                    'diff_seconds' => $now->diffInSeconds($expiryTime),
+                    'tolerance'    => '10 seconds',
+                ]);
+                return NULL;
+            }
+
+            // Check jika QR code dari masa depan (lebih dari 10 detik)
+            if ($qrTime->diffInSeconds($now, FALSE) < -10)
+            {
+                \Log::warning('QR code from future', [
+                    'now'          => $now->toISOString(),
+                    'qr_timestamp' => $qrTime->toISOString(),
+                    'diff_seconds' => $qrTime->diffInSeconds($now),
+                ]);
+                return NULL;
+            }
+
+            // Get user
+            $user = User::find($data['user_id']);
+            if (!$user)
+            {
+                \Log::error('QR validation failed: User not found', [ 'user_id' => $data['user_id'] ]);
+                return NULL;
+            }
+
+            \Log::info('QR Validation - User Found', [ 'user_id' => $user->id, 'user_email' => $user->email ]);
+
+            // Type-based validation
+            switch ($data['type'])
+            {
+                case 'user_checkin':
+                    $result = $this->validateCheckInQR($data, $user);
+                    break;
+                case 'checkout':
+                    $result = $this->validateCheckoutQR($data, $user);
+                    break;
+                case 'activity':
+                    $result = $this->validateActivityQRCode($data);
+                    break;
+                default:
+                    \Log::error('QR validation failed: Unknown type', [ 'type' => $data['type'] ]);
+                    return NULL;
+            }
+
+            \Log::info('QR Validation Result', [
+                'type'        => $data['type'],
+                'success'     => $result !== NULL,
+                'result_type' => gettype($result),
+            ]);
+
+            return $result;
 
         } catch (\Exception $e)
         {
-            Log::error('Activity QR validation error: ' . $e->getMessage());
+            \Log::error('QR validation exception: ' . $e->getMessage(), [
+                'exception' => get_class($e),
+                'trace'     => $e->getTraceAsString(),
+            ]);
             return NULL;
         }
+    }
+
+    private function validateCheckInQR($data, $user)
+    {
+
+        \Log::info('Validating Check-in QR', [ 'user_id' => $user->id ]);
+
+        // Check jika user sudah check-in hari ini untuk type yang sama
+        $today              = now()->format('Y-m-d');
+        $existingAttendance = Attendance::where('user_id', $user->id)
+            ->where('attendance_type_id', $data['attendance_type_id'] ?? NULL)
+            ->whereDate('check_in', $today)
+            ->first();
+
+        if ($existingAttendance)
+        {
+            \Log::warning('User already checked in today', [
+                'user_id'                => $user->id,
+                'existing_attendance_id' => $existingAttendance->id,
+            ]);
+            return NULL;
+        }
+
+        \Log::info('Check-in QR Validated Successfully');
+        return $user;
+    }
+
+    private function validateActivityQRCode($data)
+    {
+
+        \Log::info('Validating Activity QR', [ 'activity_id' => $data['activity_id'] ?? 'unknown' ]);
+
+        if (!isset($data['activity_id']))
+        {
+            \Log::error('Activity QR missing activity_id');
+            return NULL;
+        }
+
+        $activity = Activity::find($data['activity_id']);
+        if (!$activity)
+        {
+            \Log::error('Activity not found', [ 'activity_id' => $data['activity_id'] ]);
+            return NULL;
+        }
+
+        if (!$activity->isActive())
+        {
+            \Log::warning('Activity not active', [ 'activity_id' => $activity->id ]);
+            return NULL;
+        }
+
+        \Log::info('Activity QR Validated Successfully');
+        return $activity;
     }
 
 }
