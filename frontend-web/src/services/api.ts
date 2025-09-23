@@ -1,6 +1,8 @@
 import axios from 'axios';
 import { config } from '../config/env';
-import type { LoginCredentials, RegisterData, User, Attendance, AttendanceType } from '../types';
+import type { LoginCredentials, RegisterData, User, Attendance, AttendanceType, Activity } from '../types';
+
+export type ActivityFormData = Omit<Activity, 'id' | 'created_by'>;
 
 export const api = axios.create({
     baseURL: config.API_URL,
@@ -114,4 +116,37 @@ export const handleApiError = (error: unknown): string => {
         return error; // ✅ Handle string errors
     }
     return 'An unexpected error occurred';
+};
+export const activityAPI = {
+    // Untuk user biasa (hanya kegiatan aktif)
+    getPublicActivities: async (): Promise<Activity[]> => {
+        const response = await api.get('/activities');
+        return response.data.activities;
+    },
+    // Untuk admin (semua kegiatan)
+    getAdminActivities: async (): Promise<Activity[]> => {
+        const response = await api.get('/admin/activities');
+        return response.data.data; // Mengambil dari object paginasi
+    },
+    create: async (data: ActivityFormData): Promise<Activity> => {
+        const response = await api.post('/admin/activities', data);
+        return response.data;
+    },
+    update: async (id: number, data: Partial<ActivityFormData>): Promise<Activity> => {
+        const response = await api.put(`/admin/activities/${id}`, data);
+        return response.data;
+    },
+    delete: async (id: number): Promise<void> => {
+        await api.delete(`/admin/activities/${id}`);
+    },
+    getActivities: async (): Promise<Activity[]> => {
+        const response = await api.get('/activities');
+        return response.data.activities;
+    }
+};
+export const qrAPI = {
+    generateForActivity: async (activityId: number): Promise<{ qr_code_svg: string, expires_at: string }> => {
+        const response = await api.get(`/qr-code/activity/${activityId}`);
+        return response.data;
+    }
 };

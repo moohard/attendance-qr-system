@@ -69,11 +69,4 @@ Route::middleware([ 'auth:sanctum', 'throttle:60,1' ])->group(function ()
     {
         Route::post('/upload', [ SignatureController::class, 'upload' ]);
     });
-
-    // === RUTE KHUSUS ADMIN ===
-    Route::middleware([ 'role:admin', 'throttle:30,1' ])->prefix('admin')->name('api.admin.')->group(function ()
-    {
-        // Memanggil rute admin dari file terpisah
-        require __DIR__ . '/admin.php';
-    });
 });

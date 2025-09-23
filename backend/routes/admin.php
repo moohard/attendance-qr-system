@@ -3,55 +3,43 @@
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\StatsController;
 use App\Http\Controllers\Admin\ReportController;
-use App\Http\Controllers\Admin\AttendanceController as AdminAttendanceController;
-use App\Http\Controllers\Api\MonitoringController; // Tambahkan ini
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Admin\AttendanceController;
+use App\Http\Controllers\Admin\ActivityController;
 
-/*
-|--------------------------------------------------------------------------
-| Admin Routes
-|--------------------------------------------------------------------------
-|
-| Rute-rute ini khusus untuk admin dan secara otomatis akan memiliki
-| prefix /api/admin dan middleware role:admin dari file api.php.
-|
-*/
+// 1. Import controller baru
 
-// User Management
-Route::apiResource('users', UserController::class);
-
-// Statistics
-Route::prefix('stats')->name('stats.')->group(function ()
+Route::middleware([ 'auth:sanctum', 'role:admin', 'throttle:60,1' ])->group(function ()
 {
-    Route::get('/users', [ StatsController::class, 'userStats' ]);
-    Route::get('/attendance', [ StatsController::class, 'attendanceStats' ]);
-    Route::get('/attendance/trends', [ StatsController::class, 'attendanceTrends' ]);
-});
+    // User Management
+    Route::apiResource('users', UserController::class);
 
-// Reports
-Route::prefix('reports')->name('reports.')->group(function ()
-{
-    Route::get('/', [ ReportController::class, 'index' ]);
-    Route::post('/generate', [ ReportController::class, 'generate' ]);
-    Route::get('/{report}/download', [ ReportController::class, 'download' ]);
-    Route::post('/{report}/sign', [ ReportController::class, 'sign' ]);
-});
+    // Activity Management (BARU)
+    Route::apiResource('activities', ActivityController::class); // 2. Tambahkan rute ini
 
-// Attendance Management
-Route::prefix('attendances')->name('attendances.')->group(function ()
-{
-    Route::get('/', [ AdminAttendanceController::class, 'index' ]);
-    Route::get('/{attendance}', [ AdminAttendanceController::class, 'show' ]);
-    Route::put('/{attendance}', [ AdminAttendanceController::class, 'update' ]);
-    Route::delete('/{attendance}', [ AdminAttendanceController::class, 'destroy' ]);
-    Route::get('/export', [ AdminAttendanceController::class, 'export' ]);
-});
+    // Statistics
+    Route::get('stats/users', [ StatsController::class, 'userStats' ]);
+    Route::get('stats/attendance', [ StatsController::class, 'attendanceStats' ]);
+    Route::get('stats/attendance/trends', [ StatsController::class, 'attendanceTrends' ]);
 
-// Monitoring Routes (DIKEMBALIKAN DI SINI)
-Route::prefix('monitoring')->name('monitoring.')->group(function ()
-{
-    Route::get('/stats', [ MonitoringController::class, 'stats' ]);
-    Route::get('/trends', [ MonitoringController::class, 'trends' ]);
-    Route::get('/user-activity/{user?}', [ MonitoringController::class, 'userActivity' ]);
-    Route::post('/flush-cache', [ MonitoringController::class, 'flushCache' ]);
+    // Reports
+    Route::get('reports', [ ReportController::class, 'index' ]);
+    Route::post('reports/generate', [ ReportController::class, 'generate' ]);
+    Route::get('reports/{id}/download', [ ReportController::class, 'download' ]);
+    Route::post('reports/{id}/sign', [ ReportController::class, 'sign' ]);
+
+    // Attendance Management
+    Route::get('attendances', [ AttendanceController::class, 'index' ]);
+    Route::get('attendances/{attendance}', [ AttendanceController::class, 'show' ]);
+    Route::put('attendances/{attendance}', [ AttendanceController::class, 'update' ]);
+    Route::delete('attendances/{attendance}', [ AttendanceController::class, 'destroy' ]);
+    Route::get('attendances/export', [ AttendanceController::class, 'export' ]);
+
+    // Monitoring Routes
+    Route::prefix('monitoring')->group(function ()
+    {
+        Route::get('/stats', [ \App\Http\Controllers\Api\MonitoringController::class, 'stats' ]);
+        Route::get('/trends', [ \App\Http\Controllers\Api\MonitoringController::class, 'trends' ]);
+        Route::get('/user-activity/{userId?}', [ \App\Http\Controllers\Api\MonitoringController::class, 'userActivity' ]);
+        Route::post('/flush-cache', [ \App\Http\Controllers\Api\MonitoringController::class, 'flushCache' ]);
+    });
 });

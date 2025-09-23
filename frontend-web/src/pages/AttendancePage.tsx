@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useAttendance } from '../hooks/useAttendance';
 import { Button } from '../components/ui/Button';
+import { useAppStore } from '../stores/useAppStore';
 import { Card, CardContent, CardHeader } from '../components/ui/Card';
 import { AttendanceList } from '../components/attendance/AttendanceList';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
@@ -11,7 +11,7 @@ export const AttendancePage = () => {
         isLoading,
         error,
         loadAttendanceHistory
-    } = useAttendance();
+    } = useAppStore();
 
     const [dateRange, setDateRange] = useState({
         start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -20,7 +20,7 @@ export const AttendancePage = () => {
 
     useEffect(() => {
         loadAttendanceHistory(dateRange.start, dateRange.end);
-    }, [dateRange]);
+    }, [loadAttendanceHistory, dateRange.start, dateRange.end]);
 
     const handleDateChange = (field: 'start' | 'end', value: string) => {
         setDateRange(prev => ({ ...prev, [field]: value }));

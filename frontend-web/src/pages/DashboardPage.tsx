@@ -1,48 +1,55 @@
 import { useEffect, useState } from 'react';
-import { useAuth } from '../hooks/useAuth';
-import { useAttendance } from '../hooks/useAttendance';
+import { useAuth } from '../context/AuthContext';
+import { useAppStore } from '../stores/useAppStore'; // 1. Import store
 import { Button } from '../components/ui/Button';
 import { Card, CardContent, CardHeader } from '../components/ui/Card';
 import { AttendanceList } from '../components/attendance/AttendanceList';
 import { QrScannerComponent } from '../components/attendance/QrScanner';
 import { formatDate } from '../utils/date';
 import type { Attendance } from '../types';
+import toast from 'react-hot-toast';
 
 export const DashboardPage = () => {
     const { user } = useAuth();
+    // 2. Ambil state dan actions dari store Zustand
     const {
         attendances,
         attendanceTypes,
         loadActiveAttendances,
         loadAttendanceTypes,
         checkIn,
-        checkOut
-    } = useAttendance();
+        checkOut,
+    } = useAppStore();
 
     const [showScanner, setShowScanner] = useState(false);
     const [scannerMode, setScannerMode] = useState<'checkin' | 'checkout'>('checkin');
     const [selectedAttendance, setSelectedAttendance] = useState<Attendance | null>(null);
 
     useEffect(() => {
+        // 3. Panggil actions untuk memuat data saat komponen pertama kali render
         loadActiveAttendances();
         loadAttendanceTypes();
-    }, []);
+    }, [loadActiveAttendances, loadAttendanceTypes]);
 
     const handleCheckIn = async (qrContent: string) => {
-        // Simple QR content validation - in real app, this would be more robust
-        const qrData = JSON.parse(qrContent);
-        const result = await checkIn({
-            qr_content: qrContent,
-            attendance_type_id: qrData.attendance_type_id || 1
-        });
+        try {
+            const qrData = JSON.parse(qrContent);
+            const result = await checkIn({
+                qr_content: qrContent,
+                attendance_type_id: qrData.attendance_type_id || 1
+            });
 
-        if (result.success) {
-            setShowScanner(false);
-            await loadActiveAttendances();
+            if (result.success) {
+                setShowScanner(false);
+                // Tidak perlu panggil loadActiveAttendances() lagi, sudah dihandle di store
+            }
+        } catch (error) {
+            console.error("Invalid QR Content", error);
+            toast.error("Invalid QR Code format.");
         }
     };
 
-    const handleCheckOut = async (attendance: Attendance) => {
+    const handleCheckOut = (attendance: Attendance) => {
         setSelectedAttendance(attendance);
         setScannerMode('checkout');
         setShowScanner(true);
@@ -54,7 +61,6 @@ export const DashboardPage = () => {
             if (result.success) {
                 setShowScanner(false);
                 setSelectedAttendance(null);
-                await loadActiveAttendances();
             }
         }
     };
@@ -84,7 +90,7 @@ export const DashboardPage = () => {
                             Check In
                         </Button>
                         {activeAttendances.length > 0 && (
-                            <Button variant="outline" onClick={() => loadActiveAttendances()}>
+                            <Button variant="outline" onClick={loadActiveAttendances}>
                                 Refresh
                             </Button>
                         )}
@@ -149,3 +155,4 @@ export const DashboardPage = () => {
         </div>
     );
 };
+

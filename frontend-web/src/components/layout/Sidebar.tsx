@@ -5,20 +5,23 @@ import {
     BarChart3,
     User,
     Users,
-    Settings
+    Settings,
+    Calendar,
+    ClipboardList
 } from 'lucide-react';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from '../../context/AuthContext';
 
 const userNavigation = [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
     { name: 'Attendance', href: '/attendance', icon: Clock },
-    { name: 'Reports', href: '/reports', icon: BarChart3 },
+    { name: 'Activities', href: '/activities', icon: Calendar },
     { name: 'Profile', href: '/profile', icon: User },
 ];
 
 const adminNavigation = [
     { name: 'Admin Dashboard', href: '/admin', icon: Home },
     { name: 'User Management', href: '/admin/users', icon: Users },
+    { name: 'Activity Management', href: '/admin/activities', icon: ClipboardList },
     { name: 'Attendance Management', href: '/admin/attendance', icon: Clock },
     { name: 'Reports Management', href: '/admin/reports', icon: BarChart3 },
     { name: 'Settings', href: '/admin/settings', icon: Settings },
@@ -26,8 +29,7 @@ const adminNavigation = [
 
 export const Sidebar = () => {
     const { user } = useAuth();
-    const isAdmin = user?.role === 'admin';
-    const navigation = isAdmin ? adminNavigation : userNavigation;
+    const navigation = user?.role === 'admin' ? adminNavigation : userNavigation;
 
     return (
         <aside className="w-64 bg-white shadow-sm border-r border-gray-200 min-h-screen">
@@ -37,9 +39,10 @@ export const Sidebar = () => {
                         <NavLink
                             key={item.name}
                             to={item.href}
+                            end
                             className={({ isActive }) =>
                                 `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${isActive
-                                    ? 'bg-primary-100 text-primary-700'
+                                    ? 'bg-blue-100 text-blue-700'
                                     : 'text-gray-600 hover:bg-gray-100'
                                 }`
                             }
@@ -53,3 +56,4 @@ export const Sidebar = () => {
         </aside>
     );
 };
+

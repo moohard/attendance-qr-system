@@ -92,6 +92,7 @@ export interface PaginatedResponse<T> {
     from: number;
     to: number;
 }
+
 export interface ReportFilters {
     period?: string;
     attendance_type_id?: number;
@@ -114,4 +115,31 @@ export interface ReportGenerationRequest {
     period: string;
     attendance_type_id?: number;
     format?: 'pdf' | 'excel';
+}
+export interface Activity {
+    id: number;
+    name: string;
+    description: string;
+    start_time: string;
+    end_time: string;
+    is_recurring: boolean;
+    recurring_days: number[];
+    valid_from: string;
+    valid_to: string;
+    is_active: boolean;
+    created_by: number;
+}
+export type ActivityFormData = Omit<Activity, 'id' | 'created_by'>;
+export interface ActivityAttendance {
+    id: number;
+    activity_id: number;
+    user_id: number;
+    check_in: string;
+    check_out: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    notes: string | null;
+    is_late: boolean;
+    is_early: boolean;
+    activity?: Activity;
 }

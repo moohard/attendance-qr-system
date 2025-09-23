@@ -7,10 +7,12 @@ import { Layout } from '../components/layout/Layout';
 import { LoginPage } from '../pages/LoginPage';
 import { DashboardPage } from '../pages/DashboardPage';
 import { AttendancePage } from '../pages/AttendancePage';
+import { ActivitiesPage } from '../pages/ActivitiesPage';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { UserManagementPage } from '../pages/admin/UserManagementPage';
 import { ReportsManagementPage } from '../pages/admin/ReportsManagementPage';
 import { AttendanceManagementPage } from '../pages/admin/AttendanceManagementPage';
+import { ActivityManagementPage } from '../pages/admin/ActivityManagementPage';
 
 export const AppRoutes = () => {
     const { isAuthenticated } = useAuth();
@@ -34,6 +36,7 @@ export const AppRoutes = () => {
                 <Route index element={<Navigate to="/dashboard" replace />} />
                 <Route path="dashboard" element={<DashboardPage />} />
                 <Route path="attendance" element={<AttendancePage />} />
+                <Route path="activities" element={<ActivitiesPage />} />
             </Route>
 
             {/* Rute khusus admin */}
@@ -47,6 +50,7 @@ export const AppRoutes = () => {
             >
                 <Route index element={<AdminDashboardPage />} />
                 <Route path="users" element={<UserManagementPage />} />
+                <Route path="activities" element={<ActivityManagementPage />} />
                 <Route path="reports" element={<ReportsManagementPage />} />
                 <Route path="attendance" element={<AttendanceManagementPage />} />
                 <Route path="settings" element={<div>Settings - Coming Soon</div>} />
@@ -57,3 +61,4 @@ export const AppRoutes = () => {
         </Routes>
     );
 };
+

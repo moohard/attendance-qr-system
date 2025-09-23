@@ -9,6 +9,41 @@ use Illuminate\Support\Str;
 class SignatureEncryptionService
 {
 
+    public function sign(array $payload): string
+    {
+
+        try
+        {
+            // Convert payload to JSON string
+            $payloadString = json_encode($payload);
+
+            // Generate signature hash
+            $signature = $this->generateSignatureHash($payloadString);
+
+            return $signature;
+
+        } catch (\Exception $e)
+        {
+            throw new \Exception('Signature generation failed: ' . $e->getMessage());
+        }
+    }
+
+    public function verify(array $payload, string $signature): bool
+    {
+
+        try
+        {
+            $payloadString     = json_encode($payload);
+            $expectedSignature = $this->generateSignatureHash($payloadString);
+
+            return hash_equals($expectedSignature, $signature);
+
+        } catch (\Exception $e)
+        {
+            throw new \Exception('Signature verification failed: ' . $e->getMessage());
+        }
+    }
+
     public function encryptSignature(string $signatureData): string
     {
 

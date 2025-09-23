@@ -1,75 +1,72 @@
-import React from 'react';
 import { Card, CardContent, CardHeader } from '../ui/Card';
 import { Button } from '../ui/Button';
-import type { Activity } from '../../hooks/useActivity';
+import { formatTime } from '../../utils/date';
+import type { Activity } from '../../types';
 
 interface ActivityListProps {
     activities: Activity[];
-    onGenerateQr: (activityId: number) => void;
-    userRole: string;
+    title: string;
+    onGenerateQr?: (activityId: number) => void;
+    onEdit?: (activity: Activity) => void;
+    onDelete?: (activityId: number) => void;
+    isAdmin: boolean;
 }
 
-export const ActivityList: React.FC<ActivityListProps> = ({
-    activities,
-    onGenerateQr,
-    userRole,
-}) => {
-    const formatTime = (timeString: string) => {
-        return new Date(`2000-01-01T${timeString}`).toLocaleTimeString('id-ID', {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    };
+const getRecurringDays = (days: number[] = []) => {
+    const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    if (!days || days.length === 0) return 'N/A';
+    return days.map(day => dayNames[day]).join(', ');
+};
 
-    const getRecurringDays = (days: number[]) => {
-        const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-        return days.map(day => dayNames[day]).join(', ');
-    };
+export const ActivityList = ({ activities, title, onGenerateQr, onEdit, onDelete, isAdmin }: ActivityListProps) => {
+    if (activities.length === 0) {
+        return (
+            <Card>
+                <CardHeader><h3 className="text-lg font-semibold text-gray-900">{title}</h3></CardHeader>
+                <CardContent><p className="text-gray-500 text-center py-4">Tidak ada kegiatan yang tersedia.</p></CardContent>
+            </Card>
+        );
+    }
 
     return (
-        <div className="grid gap-4">
-            {activities.map((activity) => (
-                <Card key={activity.id}>
-                    <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-lg font-semibold text-gray-900">{activity.name}</h3>
-                            {userRole === 'admin' && (
-                                <Button
-                                    size="sm"
-                                    onClick={() => onGenerateQr(activity.id)}
-                                >
-                                    Generate QR
-                                </Button>
-                            )}
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-2">
-                            <p className="text-sm text-gray-600">{activity.description}</p>
-
-                            <div className="flex justify-between text-sm">
-                                <span>Waktu: {formatTime(activity.start_time)} - {formatTime(activity.end_time)}</span>
-                                <span className={activity.is_active ? 'text-green-600' : 'text-red-600'}>
-                                    {activity.is_active ? 'Aktif' : 'Tidak Aktif'}
-                                </span>
+        <Card>
+            <CardHeader>
+                <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+            </CardHeader>
+            <CardContent>
+                <div className="space-y-4">
+                    {activities.map((activity) => (
+                        <div
+                            key={activity.id}
+                            className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-gray-50 rounded-lg border"
+                        >
+                            <div className="flex-1 mb-3 sm:mb-0">
+                                <h4 className="font-medium text-gray-900 flex items-center">
+                                    {activity.name}
+                                    <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${activity.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                        {activity.is_active ? 'Aktif' : 'Non-Aktif'}
+                                    </span>
+                                </h4>
+                                <p className="text-sm text-gray-600">{activity.description}</p>
+                                <div className="text-xs text-gray-500 mt-1 space-x-3">
+                                    <span>Waktu: {formatTime(activity.start_time)} - {formatTime(activity.end_time)}</span>
+                                    {activity.is_recurring && (
+                                        <span>Hari: {getRecurringDays(activity.recurring_days)}</span>
+                                    )}
+                                </div>
                             </div>
-
-                            {activity.is_recurring && activity.recurring_days && (
-                                <p className="text-sm text-gray-500">
-                                    Hari: {getRecurringDays(activity.recurring_days)}
-                                </p>
-                            )}
-
-                            {activity.valid_from && activity.valid_to && (
-                                <p className="text-sm text-gray-500">
-                                    Periode: {new Date(activity.valid_from).toLocaleDateString('id-ID')} -{' '}
-                                    {new Date(activity.valid_to).toLocaleDateString('id-ID')}
-                                </p>
+                            {isAdmin && (
+                                <div className="flex space-x-2">
+                                    {onGenerateQr && <Button size="sm" variant="outline" onClick={() => onGenerateQr(activity.id)}>QR Code</Button>}
+                                    {onEdit && <Button size="sm" variant="secondary" onClick={() => onEdit(activity)}>Edit</Button>}
+                                    {onDelete && <Button size="sm" variant="danger" onClick={() => onDelete(activity.id)}>Hapus</Button>}
+                                </div>
                             )}
                         </div>
-                    </CardContent>
-                </Card>
-            ))}
-        </div>
+                    ))}
+                </div>
+            </CardContent>
+        </Card>
     );
 };
+
