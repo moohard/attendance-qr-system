@@ -27,7 +27,14 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
   },
   server: {
+    host: '0.0.0.0',
     port: 5173,
-    host: true
+    proxy: {
+      '/api': {
+        target: 'http://localhost:9001', // ✅ Sekarang bisa access localhost
+        changeOrigin: true,
+        secure: false,
+      }
+    }
   }
 })
