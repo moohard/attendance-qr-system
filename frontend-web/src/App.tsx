@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import { useAuth } from './context/AuthContext';
 import { LoadingSpinner } from './components/ui/LoadingSpinner';
 import { AppRoutes } from './routes/AppRoutes'; 
+import UpdateNotification from './components/UpdateNotification';
 
 function App() {
   const { isLoading } = useAuth();
@@ -23,6 +24,7 @@ function App() {
       <Router>
         <AppRoutes />
       </Router>
+      <UpdateNotification />
     </>
   );
 }
