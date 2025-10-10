@@ -7,6 +7,8 @@ use App\Models\ActivityAttendance;
 use App\Models\Attendance;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -39,11 +41,17 @@ class AttendanceService
                 return NULL;
             }
 
-            if (!$this->signatureService->verify($payload))
+            $signature = $payload['sig'];
+            unset($payload['sig']);
+
+            if (!$this->signatureService->verify($payload, $signature))
             {
                 Log::warning('QR Validation Failed: Invalid signature', [ 'payload' => $payload ]);
                 return NULL;
             }
+
+            // Add signature back to payload for logging and single-use check
+            $payload['sig'] = $signature;
 
             if (!isset($payload['exp']) || Carbon::createFromTimestamp($payload['exp'])->isPast())
             {
@@ -158,22 +166,43 @@ class AttendanceService
 
     public function getUserAttendanceHistory(int $userId, ?string $startDate, ?string $endDate)
     {
+        $dailyQuery = Attendance::with('attendanceType')->where('user_id', $userId);
+        $activityQuery = ActivityAttendance::with('activity')->where('user_id', $userId);
 
-        $query = Attendance::with('attendanceType')
-            ->where('user_id', $userId)
-            ->orderBy('check_in', 'desc');
-
-        if ($startDate)
-        {
-            $query->whereDate('check_in', '>=', $startDate);
+        if ($startDate) {
+            $dailyQuery->whereDate('check_in', '>=', $startDate);
+            $activityQuery->whereDate('check_in', '>=', $startDate);
         }
 
-        if ($endDate)
-        {
-            $query->whereDate('check_in', '<=', $endDate);
+        if ($endDate) {
+            $dailyQuery->whereDate('check_in', '<=', $endDate);
+            $activityQuery->whereDate('check_in', '<=', $endDate);
         }
 
-        return $query->paginate(15);
+        $dailyAttendances = $dailyQuery->get();
+        $activityAttendances = $activityQuery->get();
+
+        // Add a type identifier to each record for easier handling on the frontend
+        $dailyAttendances->each(function ($item) {
+            $item->record_type = 'daily';
+        });
+        $activityAttendances->each(function ($item) {
+            $item->record_type = 'activity';
+            // Normalize some fields for easier display if needed
+            $item->check_out = null; // Activity attendance doesn't have check-out
+        });
+
+        $combined = $dailyAttendances->concat($activityAttendances);
+        $sorted = $combined->sortByDesc('check_in');
+
+        // Manual pagination
+        $page = Paginator::resolveCurrentPage('page');
+        $perPage = 15;
+        $results = $sorted->slice(($page - 1) * $perPage, $perPage)->values();
+
+        return new LengthAwarePaginator($results, $sorted->count(), $perPage, $page, [
+            'path' => Paginator::resolveCurrentPath(),
+        ]);
     }
 
 }

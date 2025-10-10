@@ -1,33 +1,37 @@
-import { useNavigate } from 'react-router-dom'; // 1. Import useNavigate
-import { useAuth } from '../../context/AuthContext'; // 2. Pastikan import dari context
-import { Button } from '../ui/Button';
+import { useAuth } from '../../context/AuthContext';
+import { Menu } from 'lucide-react';
 
-export const Header = () => {
+interface HeaderProps {
+    toggleSidebar: () => void;
+}
 
-  const { user, logout } = useAuth();
-  const navigate = useNavigate(); // 4. Dapatkan fungsi navigate
+export const Header = ({ toggleSidebar }: HeaderProps) => {
+    const { user, logout } = useAuth();
 
-  const handleLogout = async () => {
-    await logout(); // 5. Panggil fungsi logout (tanpa argumen)
-    navigate('/login'); // 6. Lakukan navigasi setelah logout selesai
-  };
-
-  return (
-    <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Attendance QR System</h1>
-        </div>
-
-        <div className="flex items-center space-x-4">
-          <span className="text-sm text-gray-600">
-            Welcome, {user?.name}
-          </span>
-          <Button variant="outline" size="sm" onClick={handleLogout}>
-            Logout
-          </Button>
-        </div>
-      </div>
-    </header>
-  );
+    return (
+        <header className="bg-white shadow-sm border-b border-gray-200">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex justify-between items-center h-16">
+                    <div className="flex items-center">
+                        <button 
+                            onClick={toggleSidebar} 
+                            className="md:hidden mr-4 p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                        >
+                            <Menu className="h-6 w-6" />
+                        </button>
+                        <h1 className="text-xl font-bold text-gray-800">Dashboard</h1>
+                    </div>
+                    <div className="flex items-center">
+                        <span className="mr-4">Welcome, {user?.name}</span>
+                        <button
+                            onClick={logout}
+                            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                        >
+                            Logout
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+    );
 };

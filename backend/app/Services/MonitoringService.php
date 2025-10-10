@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ActivityAttendance;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -14,25 +15,26 @@ class MonitoringService
     public function getSystemStats(): array
     {
 
-        return Cache::remember('system_stats', 60, function ()
-        { // Cache for 1 minute
+        return Cache::remember('system_stats', 60, function () {
+            $todayDailyCheckins = Attendance::whereDate('check_in', today());
+            $todayActivityCheckins = ActivityAttendance::whereDate('check_in', today());
+
             return [
                 'users'       => [
                     'total'        => User::count(),
-                    'active_today' => User::whereHas('attendances', function ($query)
-                    {
+                    'active_today' => User::whereHas('attendances', function ($query) {
+                        $query->whereDate('check_in', today());
+                    })->orWhereHas('activityAttendances', function ($query) {
                         $query->whereDate('check_in', today());
                     })->count(),
                     'admins'       => User::where('role', 'admin')->count(),
                     'honorer'      => User::where('is_honorer', TRUE)->count(),
                 ],
                 'attendance'  => [
-                    'today_checkins'  => Attendance::whereDate('check_in', today())->count(),
-                    'today_checkouts' => Attendance::whereDate('check_out', today())->count(),
-                    'late_checkins'   => Attendance::whereDate('check_in', today())
-                        ->where('is_late', TRUE)->count(),
-                    'active_sessions' => Attendance::whereDate('check_in', today())
-                        ->whereNull('check_out')->count(),
+                    'today_checkins'  => (clone $todayDailyCheckins)->count() + (clone $todayActivityCheckins)->count(),
+                    'today_checkouts' => Attendance::whereDate('check_out', today())->count() + ActivityAttendance::whereDate('check_out', today())->count(),
+                    'late_checkins'   => (clone $todayDailyCheckins)->where('is_late', TRUE)->count() + (clone $todayActivityCheckins)->where('is_late', TRUE)->count(),
+                    'active_sessions' => (clone $todayDailyCheckins)->whereNull('check_out')->count() + (clone $todayActivityCheckins)->whereNull('check_out')->count(),
                 ],
                 'system'      => [
                     'memory_usage'         => memory_get_usage(TRUE) / 1024 / 1024, // MB
@@ -54,17 +56,21 @@ class MonitoringService
 
         $trends = [];
 
-        for ($i = $days - 1; $i >= 0; $i--)
-        {
+        for ($i = $days - 1; $i >= 0; $i--) {
             $date = now()->subDays($i)->format('Y-m-d');
 
+            $dailyCheckins = Attendance::whereDate('check_in', $date);
+            $activityCheckins = ActivityAttendance::whereDate('check_in', $date);
+
+            $dailyCheckouts = Attendance::whereDate('check_out', $date);
+            $activityCheckouts = ActivityAttendance::whereDate('check_out', $date);
+
             $trends[$date] = [
-                'checkins'  => Attendance::whereDate('check_in', $date)->count(),
-                'checkouts' => Attendance::whereDate('check_out', $date)->count(),
-                'late'      => Attendance::whereDate('check_in', $date)
-                    ->where('is_late', TRUE)->count(),
+                'checkins'  => (clone $dailyCheckins)->count() + (clone $activityCheckins)->count(),
+                'checkouts' => (clone $dailyCheckouts)->count() + (clone $activityCheckouts)->count(),
+                'late'      => (clone $dailyCheckins)->where('is_late', TRUE)->count() + (clone $activityCheckins)->where('is_late', TRUE)->count(),
                 'early'     => Attendance::whereDate('check_out', $date)
-                    ->where('is_early', TRUE)->count(),
+                    ->where('is_early', TRUE)->count() + ActivityAttendance::whereDate('check_out', $date)->where('is_early', TRUE)->count(),
             ];
         }
 
@@ -76,8 +82,7 @@ class MonitoringService
 
         $query = Attendance::query();
 
-        if ($userId)
-        {
+        if ($userId) {
             $query->where('user_id', $userId);
         }
 

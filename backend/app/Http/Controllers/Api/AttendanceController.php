@@ -29,32 +29,56 @@ class AttendanceController extends Controller
      */
     public function checkIn(CheckInRequest $request)
     {
-
-        try
-        {
+        try {
             $validatedData = $request->validated();
-            $user          = $this->attendanceService->validateQRCode($validatedData['qr_content']);
+            $payload = $this->attendanceService->validateAndParseQrCode($validatedData['qr_content']);
 
-            if (!$user)
-            {
-                return response()->json([ 'error' => 'QR code tidak valid atau sudah kadaluarsa' ], 400);
+            if (!$payload) {
+                return response()->json(['error' => 'QR code tidak valid atau sudah kadaluarsa'], 400);
             }
 
-            $attendance = $this->attendanceService->checkIn(
-                $user,
-                $validatedData['attendance_type_id'],
-                $validatedData['latitude'] ?? NULL,
-                $validatedData['longitude'] ?? NULL,
-                $validatedData['notes'] ?? NULL
-            );
+            $type = $payload['type'] ?? 'unknown';
 
-            return response()->json([
-                'message'    => 'Check-in berhasil',
-                'attendance' => $attendance->load('attendanceType'),
-            ], 201);
-        } catch (\Exception $e)
-        {
-            return response()->json([ 'error' => $e->getMessage() ], 400);
+            if ($type === 'daily') {
+                if (empty($validatedData['attendance_type_id'])) {
+                    return response()->json(['error' => 'attendance_type_id is required for daily attendance.'], 422);
+                }
+
+                $attendance = $this->attendanceService->checkIn(
+                    $request->user(),
+                    $validatedData['attendance_type_id'],
+                    $validatedData['latitude'] ?? null,
+                    $validatedData['longitude'] ?? null,
+                    $validatedData['notes'] ?? null,
+                    $payload
+                );
+
+                return response()->json([
+                    'message'    => 'Check-in harian berhasil',
+                    'attendance' => $attendance->load('attendanceType'),
+                ], 201);
+            } elseif ($type === 'activity') {
+                if (empty($payload['activity_id'])) {
+                    return response()->json(['error' => 'Invalid activity QR code: activity_id is missing.'], 422);
+                }
+
+                $activityAttendance = $this->attendanceService->checkInActivity(
+                    $request->user(),
+                    $payload['activity_id'],
+                    $validatedData['latitude'] ?? null,
+                    $validatedData['longitude'] ?? null,
+                    $validatedData['notes'] ?? null
+                );
+
+                return response()->json([
+                    'message'    => 'Check-in kegiatan berhasil',
+                    'attendance' => $activityAttendance->load('activity'),
+                ], 201);
+            } else {
+                return response()->json(['error' => 'Jenis QR code tidak valid.'], 400);
+            }
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 400);
         }
     }
 

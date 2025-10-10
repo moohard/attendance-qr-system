@@ -13,7 +13,7 @@ export const ActivityManagementPage = () => {
         isLoading,
         loadAllActivities,
         deleteActivity,
-        generateActivityQrCode // 1. Ambil fungsi generate QR dari store
+        generateActivityQrCode
     } = useAppStore();
 
     const [isModalOpen, setModalOpen] = useState(false);

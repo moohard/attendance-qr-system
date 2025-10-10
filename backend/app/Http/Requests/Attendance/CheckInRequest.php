@@ -27,7 +27,7 @@ class CheckInRequest extends FormRequest
         // Aturan ini diambil langsung dari method checkIn Anda
         return [
             'qr_content'         => 'required|string',
-            'attendance_type_id' => 'required|exists:attendance_types,id',
+            'attendance_type_id' => 'nullable|exists:attendance_types,id',
             'latitude'           => 'nullable|numeric',
             'longitude'          => 'nullable|numeric',
             'notes'              => 'nullable|string|max:500',

@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityAttendance;
 use App\Models\Attendance;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\DB;
 
 class AttendanceController extends Controller
@@ -13,55 +16,83 @@ class AttendanceController extends Controller
 
     public function index(Request $request)
     {
+        $perPage = $request->input('per_page', 10);
+        $page = Paginator::resolveCurrentPage('page');
 
-        $query = Attendance::with([ 'user', 'attendanceType' ]);
+        // --- Build Daily Attendance Query ---
+        $dailyQuery = Attendance::with(['user', 'attendanceType']);
 
-        // Apply filters
-        if ($request->has('user_id'))
-        {
-            $query->where('user_id', $request->user_id);
+        // --- Build Activity Attendance Query ---
+        $activityQuery = ActivityAttendance::with(['user', 'activity']);
+
+        // --- Apply Common Filters ---
+        $filters = [
+            'user_id', 'is_late', 'is_early'
+        ];
+
+        foreach ($filters as $filter) {
+            if ($request->has($filter)) {
+                $dailyQuery->where($filter, $request->input($filter));
+                $activityQuery->where($filter, $request->input($filter));
+            }
         }
 
-        if ($request->has('attendance_type_id'))
-        {
-            $query->where('attendance_type_id', $request->attendance_type_id);
+        // Date filters
+        if ($request->has('date')) {
+            $dailyQuery->whereDate('check_in', $request->date);
+            $activityQuery->whereDate('check_in', $request->date);
+        }
+        if ($request->has('start_date')) {
+            $dailyQuery->whereDate('check_in', '>=', $request->start_date);
+            $activityQuery->whereDate('check_in', '>=', $request->start_date);
+        }
+        if ($request->has('end_date')) {
+            $dailyQuery->whereDate('check_in', '<=', $request->end_date);
+            $activityQuery->whereDate('check_in', '<=', $request->end_date);
         }
 
-        if ($request->has('date'))
-        {
-            $query->whereDate('check_in', $request->date);
+        // --- Handle Specific Filters ---
+        $dailyAttendances = collect();
+        $activityAttendances = collect();
+
+        // If a specific activity is requested, only fetch that.
+        if ($request->has('activity_id')) {
+            $activityQuery->where('activity_id', $request->activity_id);
+            $activityAttendances = $activityQuery->get();
+        } 
+        // If a specific attendance type is requested, only fetch that.
+        else if ($request->has('attendance_type_id')) {
+            $dailyQuery->where('attendance_type_id', $request->attendance_type_id);
+            $dailyAttendances = $dailyQuery->get();
+        } 
+        // Otherwise, fetch from both.
+        else {
+            $dailyAttendances = $dailyQuery->get();
+            $activityAttendances = $activityQuery->get();
         }
 
-        if ($request->has('start_date'))
-        {
-            $query->whereDate('check_in', '>=', $request->start_date);
-        }
+        // --- Merge & Paginate ---
+        $dailyAttendances->each(function ($item) {
+            $item->record_type = 'daily';
+        });
+        $activityAttendances->each(function ($item) {
+            $item->record_type = 'activity';
+        });
 
-        if ($request->has('end_date'))
-        {
-            $query->whereDate('check_in', '<=', $request->end_date);
-        }
+        $combined = $dailyAttendances->concat($activityAttendances);
+        $sorted = $combined->sortByDesc('check_in');
 
-        if ($request->has('is_late'))
-        {
-            $query->where('is_late', $request->boolean('is_late'));
-        }
+        $paginatedResults = $sorted->slice(($page - 1) * $perPage, $perPage)->values();
 
-        if ($request->has('is_early'))
-        {
-            $query->where('is_early', $request->boolean('is_early'));
-        }
+        $paginator = new LengthAwarePaginator(
+            $paginatedResults,
+            $sorted->count(),
+            $perPage,
+            $page,
+            ['path' => Paginator::resolveCurrentPath()]
+        );
 
-        $perPage     = $request->per_page ?? 10;
-        $attendances = $query->orderBy('check_in', 'desc')->paginate($perPage);
-
-        return response()->json([
-            'data'         => $attendances->items(),
-            'current_page' => $attendances->currentPage(),
-            'last_page'    => $attendances->lastPage(),
-            'per_page'     => $attendances->perPage(),
-            'total'        => $attendances->total(),
-        ]);
+        return response()->json($paginator);
     }
 
     public function show(Attendance $attendance)
@@ -96,88 +127,90 @@ class AttendanceController extends Controller
 
     public function export(Request $request)
     {
-
         $validated = $request->validate([
             'format'             => 'required|in:csv,excel',
             'start_date'         => 'nullable|date',
             'end_date'           => 'nullable|date|after_or_equal:start_date',
             'user_id'            => 'nullable|exists:users,id',
             'attendance_type_id' => 'nullable|exists:attendance_types,id',
+            'activity_id'        => 'nullable|exists:activities,id',
         ]);
 
-        $query = Attendance::with([ 'user', 'attendanceType' ]);
+        // --- Build Queries ---
+        $dailyQuery = Attendance::with(['user', 'attendanceType']);
+        $activityQuery = ActivityAttendance::with(['user', 'activity']);
 
-        // Apply filters
-        if ($request->has('start_date'))
-        {
-            $query->whereDate('check_in', '>=', $validated['start_date']);
+        // --- Apply Common Filters ---
+        $commonFilters = ['user_id'];
+        foreach ($commonFilters as $filter) {
+            if (isset($validated[$filter])) {
+                $dailyQuery->where($filter, $validated[$filter]);
+                $activityQuery->where($filter, $validated[$filter]);
+            }
+        }
+        if (isset($validated['start_date'])) {
+            $dailyQuery->whereDate('check_in', '>=', $validated['start_date']);
+            $activityQuery->whereDate('check_in', '>=', $validated['start_date']);
+        }
+        if (isset($validated['end_date'])) {
+            $dailyQuery->whereDate('check_in', '<=', $validated['end_date']);
+            $activityQuery->whereDate('check_in', '<=', $validated['end_date']);
         }
 
-        if ($request->has('end_date'))
-        {
-            $query->whereDate('check_in', '<=', $validated['end_date']);
+        // --- Handle Specific Filters & Fetch ---
+        $dailyAttendances = collect();
+        $activityAttendances = collect();
+
+        if (isset($validated['activity_id'])) {
+            $activityQuery->where('activity_id', $validated['activity_id']);
+            $activityAttendances = $activityQuery->get();
+        } else if (isset($validated['attendance_type_id'])) {
+            $dailyQuery->where('attendance_type_id', $validated['attendance_type_id']);
+            $dailyAttendances = $dailyQuery->get();
+        } else {
+            $dailyAttendances = $dailyQuery->get();
+            $activityAttendances = $activityQuery->get();
         }
 
-        if ($request->has('user_id'))
-        {
-            $query->where('user_id', $validated['user_id']);
-        }
+        // --- Merge ---
+        $dailyAttendances->each(fn($item) => $item->record_type = 'daily');
+        $activityAttendances->each(fn($item) => $item->record_type = 'activity');
+        $attendances = $dailyAttendances->concat($activityAttendances)->sortByDesc('check_in');
 
-        if ($request->has('attendance_type_id'))
-        {
-            $query->where('attendance_type_id', $validated['attendance_type_id']);
-        }
-
-        $attendances = $query->orderBy('check_in', 'desc')->get();
-
-        // Generate CSV
-        if ($validated['format'] === 'csv')
-        {
+        // --- Generate Export ---
+        if ($validated['format'] === 'csv' || $validated['format'] === 'excel') {
             return $this->exportToCSV($attendances);
         }
 
-        // Generate Excel (basic CSV for now)
-        return $this->exportToCSV($attendances);
+        // Fallback or other formats can be handled here
+        return response()->json(['message' => 'Invalid format'], 400);
     }
 
     private function exportToCSV($attendances)
     {
-
         $fileName = 'attendances-' . date('Y-m-d') . '.csv';
-
         $headers = [
             'Content-Type'        => 'text/csv',
             'Content-Disposition' => "attachment; filename=\"{$fileName}\"",
         ];
 
-        $callback = function () use ($attendances)
-        {
+        $callback = function () use ($attendances) {
             $file = fopen('php://output', 'w');
 
-            // CSV header
             fputcsv($file, [
-                'User Name',
-                'Email',
-                'Attendance Type',
-                'Check-in',
-                'Check-out',
-                'Duration',
-                'Late',
-                'Early',
-                'Notes',
+                'User Name', 'Email', 'Attendance Type', 'Check-in', 'Check-out', 'Duration (H:M)', 'Late', 'Early', 'Notes'
             ]);
 
-            // CSV data
-            foreach ($attendances as $attendance)
-            {
-                $duration = $attendance->check_out
-                    ? gmdate('H:i', strtotime($attendance->check_out) - strtotime($attendance->check_in))
-                    : '';
+            foreach ($attendances as $attendance) {
+                $duration = $attendance->check_out ? gmdate('H:i', strtotime($attendance->check_out) - strtotime($attendance->check_in)) : '';
+                $type = $attendance->record_type === 'activity'
+                    ? ($attendance->activity->name ?? 'N/A')
+                    : ($attendance->attendanceType->name ?? 'N/A');
 
                 fputcsv($file, [
-                    $attendance->user->name,
-                    $attendance->user->email,
-                    $attendance->attendanceType->name,
+                    $attendance->user->name ?? 'N/A',
+                    $attendance->user->email ?? 'N/A',
+                    $type,
                     $attendance->check_in,
                     $attendance->check_out,
                     $duration,

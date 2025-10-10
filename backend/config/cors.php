@@ -10,6 +10,7 @@ return [
         'http://localhost:5173',
         'http://127.0.0.1:5173',
         'http://10.10.20.251:5173',
+        'http://10.10.20.249:5174',
     ],
 
     'allowed_origins_patterns' => [],

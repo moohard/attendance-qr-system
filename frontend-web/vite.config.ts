@@ -1,41 +1,31 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { visualizer } from 'rollup-plugin-visualizer'
+import basicSsl from '@vitejs/plugin-basic-ssl'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     react(),
-    visualizer({
-      filename: 'dist/stats.html',
-      open: false,
-      gzipSize: true,
-      brotliSize: true,
-    }),
+    basicSsl(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'vite.svg'],
       manifest: {
-        name: 'My Awesome App',
-        short_name: 'MyApp',
-        description: 'My Awesome Progressive Web App',
+        name: 'Attendance QR System',
+        short_name: 'AttendanceQR',
+        description: 'A QR-based attendance system.',
         theme_color: '#ffffff',
         icons: [
           {
-            src: 'pwa-192x192.png',
+            src: 'icons/icon-192.png',
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: 'pwa-512x512.png',
+            src: 'icons/icon-512.png',
             sizes: '512x512',
             type: 'image/png'
-          },
-          {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any maskable'
           }
         ]
       }
@@ -56,10 +46,11 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',
-    port: 5173,
+    port: 5174,
+    https: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:9001', // ✅ Sekarang bisa access localhost
+        target: 'http://localhost:8000', // ✅ Sekarang bisa access localhost
         changeOrigin: true,
         secure: false,
       }

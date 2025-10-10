@@ -1,11 +1,17 @@
 import { formatDate, formatTime } from '../../utils/date';
 import { Card, CardContent, CardHeader } from '../ui/Card';
-import type { Attendance } from '../../types';
+import type { Attendance as DailyAttendance, Activity } from '../../types';
+
+// Define a more inclusive type to handle both daily and activity attendance records.
+type CombinedAttendance = DailyAttendance & {
+  record_type?: 'daily' | 'activity';
+  activity?: Activity;
+};
 
 interface AttendanceListProps {
-    attendances: Attendance[];
+    attendances: CombinedAttendance[];
     title: string;
-    onCheckOut?: (attendance: Attendance) => void;
+    onCheckOut?: (attendance: CombinedAttendance) => void;
     showCheckOut?: boolean;
 }
 
@@ -16,7 +22,7 @@ export const AttendanceList = ({
     showCheckOut = false
 }: AttendanceListProps) => {
     if (attendances.length === 0) {
-        return null;
+        return null; // Don't render the card if there's no data
     }
 
     return (
@@ -28,12 +34,14 @@ export const AttendanceList = ({
                 <div className="space-y-4">
                     {attendances.map((attendance) => (
                         <div
-                            key={attendance.id}
+                            key={`${attendance.record_type}-${attendance.id}`}
                             className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
                         >
                             <div className="flex-1">
                                 <h4 className="font-medium text-gray-900">
-                                    {attendance.attendance_type?.name}
+                                    {attendance.record_type === 'activity'
+                                        ? attendance.activity?.name
+                                        : attendance.attendance_type?.name}
                                 </h4>
                                 <p className="text-sm text-gray-600">
                                     Check-in: {formatTime(attendance.check_in)}

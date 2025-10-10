@@ -58,7 +58,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
         set({ isLoading: true, error: null });
         try {
             const response = await attendanceAPI.getHistory({ start_date: startDate, end_date: endDate });
-            set({ attendances: response.history });
+            set({ attendances: Array.isArray(response.history.data) ? response.history.data : [] });
         } catch (err) {
             const errorMsg = handleApiError(err);
             set({ error: errorMsg });
@@ -71,7 +71,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
         set({ isLoading: true, error: null });
         try {
             const response = await attendanceAPI.getActive();
-            set({ attendances: response.active_attendances });
+            set({ attendances: Array.isArray(response.active_attendances) ? response.active_attendances : [] });
         } catch (err) {
             const errorMsg = handleApiError(err);
             set({ error: errorMsg });

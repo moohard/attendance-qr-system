@@ -5,11 +5,17 @@ import { DataTable } from '../../components/admin/DataTable';
 import { Button } from '../../components/ui/Button';
 import type { LoadingSpinner } from '../ui/LoadingSpinner';
 import { formatDate, formatTime } from '../../utils/date';
-import type { Attendance, AttendanceFilters } from '../../types';
+import type { Attendance as DailyAttendance, Activity, AttendanceFilters } from '../../types';
+
+// A more inclusive type for the unified attendance data
+type CombinedAttendance = DailyAttendance & {
+    record_type?: 'daily' | 'activity';
+    activity?: Activity;
+};
 
 export const AttendanceManagementPage = () => {
     const { getAttendances, exportAttendances, isLoading } = useAdmin();
-    const [attendances, setAttendances] = useState<Attendance[]>([]);
+    const [attendances, setAttendances] = useState<CombinedAttendance[]>([]);
     const [pagination, setPagination] = useState({ page: 1, perPage: 10, total: 0 });
     const [filters, setFilters] = useState<AttendanceFilters>({});
     const [showFilters, setShowFilters] = useState(false);
@@ -25,8 +31,7 @@ export const AttendanceManagementPage = () => {
             setPagination(prev => ({
                 ...prev,
                 total: response.total,
-                from: response.from,
-                to: response.to
+                page: response.current_page,
             }));
         } catch (error) {
             console.error('Failed to load attendances:', error);
@@ -50,23 +55,29 @@ export const AttendanceManagementPage = () => {
     };
 
     const columns = [
-        { header: 'User', accessor: (att: Attendance) => att.user?.name || 'Unknown' },
-        { header: 'Type', accessor: (att: Attendance) => att.attendance_type?.name },
+        { header: 'User', accessor: (att: CombinedAttendance) => att.user?.name || 'Unknown' },
+        {
+            header: 'Type',
+            accessor: (att: CombinedAttendance) =>
+                att.record_type === 'activity'
+                    ? att.activity?.name
+                    : att.attendance_type?.name,
+        },
         {
             header: 'Check-in',
-            accessor: (att: Attendance) => formatTime(att.check_in)
+            accessor: (att: CombinedAttendance) => formatTime(att.check_in)
         },
         {
             header: 'Check-out',
-            accessor: (att: Attendance) => att.check_out ? formatTime(att.check_out) : '-'
+            accessor: (att: CombinedAttendance) => att.check_out ? formatTime(att.check_out) : '-'
         },
         {
             header: 'Date',
-            accessor: (att: Attendance) => formatDate(att.check_in)
+            accessor: (att: CombinedAttendance) => formatDate(att.check_in)
         },
         {
             header: 'Status',
-            accessor: (att: Attendance) => (
+            accessor: (att: CombinedAttendance) => (
                 <div className="flex flex-wrap gap-1">
                     {att.is_late && (
                         <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
